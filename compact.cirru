@@ -1,6 +1,6 @@
 
 {} (:package |cirru-writer)
-  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!) (:modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru) (:version |0.2.0)
+  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!) (:modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru) (:version |0.2.1)
   :files $ {}
     |cirru-writer.core $ {}
       :ns $ quote
@@ -96,10 +96,9 @@
         |special-charset $ quote
           def special-charset $ #{} & (split allowed-chars "\"")
         |write-code $ quote
-          defn$ write-code
-              exprs
-              write-code exprs $ {} (:inline? false)
-            (exprs options)
+          defn write-code (exprs & args)
+            let
+                options $ either (first args) ({} $ :inline? false)
               generate-statements exprs options
         |char-open $ quote (def char-open "\"(")
         |char-space $ quote (def char-space "\" ")
