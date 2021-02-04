@@ -1,6 +1,6 @@
 
 {} (:package |cirru-writer)
-  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!) (:modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru) (:version |0.2.1)
+  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!) (:modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru |calcit-test/compact.cirru) (:version |0.2.1)
   :files $ {}
     |cirru-writer.core $ {}
       :ns $ quote
@@ -187,91 +187,96 @@
       :proc $ quote ()
     |cirru-writer.main $ {}
       :ns $ quote
-        ns cirru-writer.main $ :require ([] respo.core :refer $ [] render! clear-cache! realize-ssr!) ([] cirru-writer.comp.container :refer $ [] comp-container) ([] cirru-writer.updater :refer $ [] updater) ([] cirru-writer.schema :as schema) ([] reel.core :refer $ [] reel-updater refresh-reel) ([] reel.util :refer $ [] listen-devtools!) ([] reel.schema :as reel-schema) ([] cirru-writer.config :as config)
+        ns cirru-writer.main $ :require ([] respo.core :refer $ [] render! clear-cache! realize-ssr!) ([] cirru-writer.comp.container :refer $ [] comp-container) ([] cirru-writer.updater :refer $ [] updater) ([] cirru-writer.schema :as schema) ([] reel.core :refer $ [] reel-updater refresh-reel) ([] reel.util :refer $ [] listen-devtools!) ([] reel.schema :as reel-schema) ([] cirru-writer.config :as config) ([] cirru-writer.test :refer $ [] run-tests)
       :defs $ {}
         |*reel $ quote
           defatom *reel $ -> reel-schema/reel (assoc :base schema/store) (assoc :store schema/store)
         |dispatch! $ quote
           defn dispatch! (op op-data) (when config/dev? $ println "\"Dispatch:" op) (reset! *reel $ reel-updater updater @*reel op op-data)
         |main! $ quote
-          defn main! () (if ssr? $ render-app! realize-ssr!) (render-app! render!)
-            add-watch *reel :changes $ fn () (render-app! render!)
-            listen-devtools! |a dispatch!
-            println "|App started."
-        |mount-target $ quote (def mount-target $ .querySelector js/document |.app)
+          defn main! ()
+            if
+              = |ci $ with-log (get-env |env)
+              run-tests
+              do (render-app! render!)
+                add-watch *reel :changes $ fn (reel prev) (render-app! render!)
+                listen-devtools! |a dispatch!
+                println "|App started."
+        |mount-target $ quote
+          def mount-target $ if (exists? js/document) (.querySelector js/document |.app)
         |reload! $ quote
           defn reload! () (clear-cache!) (reset! *reel $ refresh-reel @*reel schema/store updater) (println "|Code updated.")
         |render-app! $ quote
           defn render-app! (renderer)
             renderer mount-target (comp-container @*reel) (\ dispatch! % %2)
-        |ssr? $ quote
-          def ssr? $ some? (js/document.querySelector |meta.respo-ssr)
       :proc $ quote ()
     |cirru-writer.test $ {}
       :ns $ quote
-        ns cirru-writer.test $ :require ([] cljs.test :refer $ [] deftest run-tests is testing) ([] cirru-writer.core :refer $ [] write-code) ([] cljs.reader :refer $ [] read-string) ([] cirru-parser.core :refer $ [] parse) ([] |fs :as fs)
+        ns cirru-writer.test $ :require ([] calcit-test.core :refer $ [] deftest is testing) ([] cirru-writer.core :refer $ [] write-code)
       :defs $ {}
         |spaces-test $ quote
           deftest spaces-test $ let
-              data $ read-string (slurp |examples/ast/spaces.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/spaces.json)
               expected $ slurp |examples/cirru/spaces.cirru
             testing "|writing case for spaces"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |indent-test $ quote
           deftest indent-test $ let
-              data $ read-string (slurp |examples/ast/indent.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/indent.json)
               expected $ slurp |examples/cirru/indent.cirru
             testing "|writing case for indent"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |line-test $ quote
           deftest line-test $ let
-              data $ read-string (slurp |examples/ast/line.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/line.json)
               expected $ slurp |examples/cirru/line.cirru
             testing "|case for line"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
+        |run-tests $ quote
+          defn run-tests () (demo-test) (double-nesting-test) (fold-vectors-test) (folding-test) (html-test) (indent-test) (inline-mode-test) (inline-simple-test) (line-test) (nested-2-test) (parentheses-test) (quote-test) (spaces-test) (unfolding-test)
         |parentheses-test $ quote
           deftest parentheses-test $ let
-              data $ read-string (slurp |examples/ast/parentheses.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/parentheses.json)
               expected $ slurp |examples/cirru/parentheses.cirru
             testing "|writing case for parentheses"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |slurp $ quote
-          defn slurp (x) (fs/readFileSync x |utf8)
+          defmacro slurp (x) (read-file x)
         |fold-vectors-test $ quote
           deftest fold-vectors-test $ let
-              data $ read-string (slurp |examples/ast/fold-vectors.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/fold-vectors.json)
               expected $ slurp |examples/cirru/fold-vectors.cirru
             testing "|writing case for fold-vectors"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ =
                 write-code data $ {} (:inline? true)
                 , expected
         |inline-mode-test $ quote
           deftest inline-mode-test $ let
-              data $ read-string (slurp |examples/ast/inline-mode.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/inline-mode.json)
               expected $ slurp |examples/cirru/inline-mode.cirru
             testing "|writing case for inline-mode"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ =
                 write-code data $ {} (:inline? true)
                 , expected
         |folding-test $ quote
           deftest folding-test $ let
-              data $ read-string (slurp |examples/ast/folding.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/folding.json)
               expected $ slurp |examples/cirru/folding.cirru
             testing "|writing case for folding"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |inline-simple-test $ quote
           deftest inline-simple-test $ let
-              data $ read-string (slurp |examples/ast/inline-simple.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/inline-simple.json) (, true)
               expected $ slurp |examples/cirru/inline-simple.cirru
             testing "|writing case for inline-simple"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ =
                 write-code data $ {} (:inline? true)
                 , expected
@@ -286,37 +291,37 @@
                 , expected
         |html-test $ quote
           deftest html-test $ let
-              data $ read-string (slurp |examples/ast/html.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/html.json) (, true)
               expected $ slurp |examples/cirru/html.cirru
               expected-inline $ slurp |examples/cirru/html-inline.cirru
             testing "|writing case for html"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
             testing "|writing case for html inline"
-              is $ = (parse expected-inline) data
+              is $ = (parse-cirru expected-inline) data
               is $ =
                 write-code data $ {} (:inline? true)
                 , expected-inline
         |double-nesting-test $ quote
           deftest double-nesting-test $ let
-              data $ read-string (slurp |examples/ast/double-nesting.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/double-nesting.json)
               expected $ slurp |examples/cirru/double-nesting.cirru
             testing "|writing case for double-nesting"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |nested-2-test $ quote
           deftest nested-2-test $ let
-              data $ read-string (slurp |examples/ast/nested-2.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/nested-2.json)
               expected $ slurp |examples/cirru/nested-2.cirru
             testing "|writing case for nested-2"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |demo-test $ quote
           deftest demo-test $ let
-              data $ read-string (slurp |examples/ast/demo.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/demo.json)
               expected $ slurp |examples/cirru/demo.cirru
             testing "|writing case for demo"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |inline-let-test $ quote
           deftest inline-let-test $ let
@@ -327,17 +332,17 @@
               is $ = (write-code data) expected
         |quote-test $ quote
           deftest quote-test $ let
-              data $ read-string (slurp |examples/ast/quote.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/quote.json)
               expected $ slurp |examples/cirru/quote.cirru
             testing "|case for quote"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |unfolding-test $ quote
           deftest unfolding-test $ let
-              data $ read-string (slurp |examples/ast/unfolding.edn)
+              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/unfolding.json)
               expected $ slurp |examples/cirru/unfolding.cirru
             testing "|writing case for unfolding"
-              is $ = (parse expected) data
+              is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
       :proc $ quote
           defn main! () (run-tests)
@@ -347,7 +352,7 @@
         ns cirru-writer.updater $ :require ([] respo.cursor :refer $ [] update-states)
       :defs $ {}
         |updater $ quote
-          defn updater (store op op-data)
+          defn updater (store op op-data op-id op-time)
             case op (:states $ update-states store op-data) (:content $ assoc store :content op-data)
               :generate $ merge store op-data ({} $ :error nil)
               :error $ assoc store :error op-data
@@ -389,7 +394,7 @@
                   {} $ :style
                     merge ui/row $ {} (:padding "|0 8px")
                   textarea $ {} (:style $ merge ui/expand ui/textarea style-input-content) (:value $ :content store)
-                    :on-input $ fn (e d! m!) (d! :content $ :value e)
+                    :on-input $ fn (e d!) (d! :content $ :value e)
                   textarea $ {} (:style $ merge ui/expand ui/textarea style-input-content) (:value $ :result store)
         |style-code $ quote
           def style-code $ {} (:font-family |Menlo,monospace) (:background-color $ hsl 0 0 94) (:padding 8) (:margin 0) (:font-size 12) (:overflow :auto) (:white-space :pre-line) (:line-height 1.8)
