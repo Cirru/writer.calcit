@@ -1191,6 +1191,27 @@
                 :data $ {}
                   |T $ {} (:type :leaf) (:text |println) (:by |root) (:at 1512220041291)
                   |j $ {} (:type :leaf) (:text "||Code updated.") (:by |root) (:at 1512220041291)
+              |w $ {} (:type :expr) (:by |Sk6m_HRlG) (:at 1613617759771)
+                :data $ {}
+                  |T $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |add-watch)
+                  |j $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |*reel)
+                  |r $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |:changes)
+                  |v $ {} (:type :expr) (:by |Sk6m_HRlG) (:at 1613617759771)
+                    :data $ {}
+                      |T $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |fn)
+                      |j $ {} (:type :expr) (:by |Sk6m_HRlG) (:at 1613617759771)
+                        :data $ {}
+                          |T $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |reel)
+                          |j $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |prev)
+                      |r $ {} (:type :expr) (:by |Sk6m_HRlG) (:at 1613617759771)
+                        :data $ {}
+                          |T $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |render-app!)
+                          |j $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617759771) (:text |render!)
+              |vT $ {} (:type :expr) (:by |Sk6m_HRlG) (:at 1613617762911)
+                :data $ {}
+                  |T $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617765687) (:text |remove-watch)
+                  |j $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617767088) (:text |*reel)
+                  |r $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617769145) (:text |changes)
           |render-app! $ {} (:type :expr) (:by |root) (:at 1512220041291)
             :data $ {}
               |T $ {} (:type :leaf) (:text |defn) (:by |root) (:at 1512220041291)
@@ -2601,11 +2622,11 @@
                                   |j $ {} (:type :expr) (:by |root) (:at 1512218997919)
                                     :data $ {}
                                       |T $ {} (:type :leaf) (:text |:href) (:by |root) (:at 1512218999653)
-                                      |j $ {} (:type :leaf) (:text ||https://github.com/Cirru/writer.clj/) (:by |root) (:at 1512219000325)
+                                      |j $ {} (:type :leaf) (:text ||https://github.com/Cirru/writer.calcit/) (:by |Sk6m_HRlG) (:at 1613617734568)
                               |j $ {} (:type :expr) (:by |root) (:at 1512219003687)
                                 :data $ {}
                                   |D $ {} (:type :leaf) (:text |<>) (:by |root) (:at 1512219005153)
-                                  |T $ {} (:type :leaf) (:text ||Cirru/writer.clj) (:by |root) (:at 1512219026343)
+                                  |T $ {} (:type :leaf) (:text ||Cirru/writer.calcit) (:by |Sk6m_HRlG) (:at 1613617736969)
                           |t $ {} (:type :expr) (:by |root) (:at 1512219085985)
                             :data $ {}
                               |T $ {} (:type :leaf) (:text |=<) (:by |root) (:at 1512219087043)
@@ -2756,6 +2777,7 @@
                                             :data $ {}
                                               |T $ {} (:type :leaf) (:text |:padding) (:by |root) (:at 1512219226179)
                                               |j $ {} (:type :leaf) (:text "||0 8px") (:by |root) (:at 1512219241935)
+                                      |L $ {} (:type :leaf) (:by |Sk6m_HRlG) (:at 1613617730637) (:text |ui/expand)
                           |r $ {} (:type :expr) (:by |root) (:at 1512203433581)
                             :data $ {}
                               |T $ {} (:type :leaf) (:text |textarea) (:by |root) (:at 1512203436741)
@@ -2877,10 +2899,6 @@
                     :data $ {}
                       |T $ {} (:type :leaf) (:text |:flex-shrink) (:by |root) (:at 1512218891448)
                       |j $ {} (:type :leaf) (:text |0) (:by |root) (:at 1512218891448)
-                  |v $ {} (:type :expr) (:by |root) (:at 1512218891448)
-                    :data $ {}
-                      |T $ {} (:type :leaf) (:text |:height) (:by |root) (:at 1512218891448)
-                      |j $ {} (:type :leaf) (:text |600) (:by |root) (:at 1512218891448)
                   |x $ {} (:type :expr) (:by |root) (:at 1512218891448)
                     :data $ {}
                       |T $ {} (:type :leaf) (:text |:font-family) (:by |root) (:at 1512218891448)
