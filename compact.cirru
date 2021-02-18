@@ -174,7 +174,8 @@
         |mount-target $ quote
           def mount-target $ if (exists? js/document) (.querySelector js/document |.app)
         |reload! $ quote
-          defn reload! () (clear-cache!)
+          defn reload! () (clear-cache!) (remove-watch *reel changes)
+            add-watch *reel :changes $ fn (reel prev) (render-app! render!)
             reset! *reel $ refresh-reel @*reel schema/store updater
             println "|Code updated."
         |render-app! $ quote
@@ -389,8 +390,8 @@
                     merge $ {} (:padding |8) (:font-family |Helvetica,serif)
                   <> "|Demo of "
                   a
-                    {} $ :href |https://github.com/Cirru/writer.clj/
-                    <> |Cirru/writer.clj
+                    {} $ :href |https://github.com/Cirru/writer.calcit/
+                    <> |Cirru/writer.calcit
                   =< 8 nil
                   button
                     {}
@@ -412,7 +413,7 @@
                     {} $ :color :red
                 div
                   {} $ :style
-                    merge ui/row $ {} (:padding "|0 8px")
+                    merge ui/expand ui/row $ {} (:padding "|0 8px")
                   textarea $ {}
                     :style $ merge ui/expand ui/textarea style-input-content
                     :value $ :content store
@@ -431,7 +432,7 @@
             :white-space :pre-line
             :line-height 1.8
         |style-input-content $ quote
-          def style-input-content $ {} (:width 400) (:flex-shrink 0) (:height 600) (:font-family |Menlo,monospace) (:white-space :pre) (:font-size 12)
+          def style-input-content $ {} (:width 400) (:flex-shrink 0) (:font-family |Menlo,monospace) (:white-space :pre) (:font-size 12)
       :proc $ quote ()
     |cirru-writer.schema $ {}
       :ns $ quote
