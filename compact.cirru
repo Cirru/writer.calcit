@@ -1,79 +1,90 @@
 
 {} (:package |cirru-writer)
-  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!) (:modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru |calcit-test/compact.cirru) (:version |0.2.1)
+  :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!)
+    :modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru |calcit-test/compact.cirru
+    :version |0.2.1
   :files $ {}
     |cirru-writer.core $ {}
       :ns $ quote
-        ns cirru-writer.core $ :require ([] cirru-writer.list :refer $ [] transform-dollar transform-comma simple?)
+        ns cirru-writer.core $ :require
+          [] cirru-writer.list :refer $ [] simple?
       :defs $ {}
         |char-close $ quote (def char-close "\")")
         |boxed? $ quote
           defn boxed? (expr) (every? list? expr)
         |allowed-chars $ quote (def allowed-chars |-~_@#$&%!?^*=+|\/<>[]{}.,:;')
         |generate-tree $ quote
-          defn generate-tree (expr insist-head? options level)
+          defn generate-tree (expr insist-head? options level in-tail?)
             loop
                 acc "\""
                 exprs expr
                 head? true
                 prev-kind nil
-              ; println "\"loop" (pr-str acc) exprs head? prev-kind
+                bended? false
+              ; do (println "\"loop:" prev-kind head?)
+                println "\"    =>" $ pr-str acc
+                println "\"    =>" exprs
+                println "\"    =>" head? insist-head?
               if (empty? exprs) acc $ let
                   cursor $ first exprs
                   kind $ cond
+                    
                       string? cursor
                       , :leaf
-                    (= cursor $ [])
+                    (= cursor ([]))
                       , :leaf
-                    (simple? cursor)
-                      , :simple-expr
-                    (boxed? cursor)
-                      , :boxed-expr
+                    (simple? cursor) :simple-expr
+                    (boxed? cursor) :boxed-expr
                     :else :expr
-                  child $ if (= kind :leaf) (generate-leaf cursor)
-                    if (and head? insist-head?) (generate-inline-expr cursor)
-                      case kind
-                        :simple-expr $ cond
-                            = prev-kind :leaf
-                            generate-inline-expr cursor
-                          (and (:inline? options) (= prev-kind :simple-expr))
-                            str char-space $ generate-inline-expr cursor
-                          :else $ let
-                              next-level $ inc level
-                            str (render-newline next-level) (generate-tree cursor false options next-level)
-                        :expr $ let
-                            next-level $ inc level
-                          str (render-newline next-level) (generate-tree cursor false options next-level)
-                        :boxed-expr $ let
-                            next-level $ inc level
-                          str
-                            if
-                              contains? (#{} :leaf :simple-expr nil) prev-kind
-                              , char-nothing
-                              render-newline next-level
-                            generate-tree cursor
-                              or (= prev-kind :boxed-expr) (= prev-kind :expr)
-                              , options next-level
-                        kind nil
-                  result $ if
-                    or
-                      and (= prev-kind :leaf)
-                        contains? (#{} :leaf :simple-expr) kind
-                      and
-                        contains? (#{} :leaf :simple-expr) prev-kind
-                        = kind :leaf
-                    str char-space child
-                    , child
+                  next-level $ inc level
+                  child-insist-head? $ or (= prev-kind :boxed-expr) (= prev-kind :expr)
+                  tail? $ and (not head?) (not in-tail?) (= prev-kind :leaf)
+                    = 1 $ count exprs
+                    list? cursor
+                  child $ cond
+                    tail? $ if (empty? cursor) "\"$"
+                      str "\"$ " $ generate-tree cursor false options (if bended? next-level level) tail?
+                    (= kind :leaf) (generate-leaf cursor)
+                    (and head? insist-head?) (generate-inline-expr cursor)
+                    (= kind :simple-expr)
+                      cond
+                          = prev-kind :leaf
+                          generate-inline-expr cursor
+                        (and (:inline? options) (= prev-kind :simple-expr))
+                          str char-space $ generate-inline-expr cursor
+                        :else $ str (render-newline next-level) (generate-tree cursor child-insist-head? options next-level false)
+                    (= kind :expr)
+                      str (render-newline next-level) (generate-tree cursor child-insist-head? options next-level false)
+                    (= kind :boxed-expr)
+                      str
+                        if
+                          includes? (#{} :leaf :simple-expr nil) prev-kind
+                          , char-nothing $ render-newline next-level
+                        generate-tree cursor child-insist-head? options next-level false
+                    true $ raise "\"Unknown"
+                  result $ cond
+                    tail? $ str char-space child
+                    (and (= prev-kind :leaf) (= kind :leaf))
+                      str char-space child
+                    (and (= prev-kind :leaf) (= kind :simple-expr))
+                      str char-space child
+                    (and (= prev-kind :simple-expr) (= kind :leaf))
+                      str char-space child
+                    (and (= kind :leaf) (or (= prev-kind :expr) (= prev-kind :boxed-expr)))
+                      str (render-newline next-level) "\", " child
+                    true child
                 recur
                   if (empty? acc) result $ str acc result
                   rest exprs
                   , false
-                  if
-                    and (:inline? options) (= kind :simple-expr)
-                    if
-                      contains? (#{} :leaf :simple-expr) prev-kind
-                      , :simple-expr :expr
+                  if (= kind :simple-expr)
+                    if (and head? insist-head?) :simple-expr $ if (:inline? options)
+                      if
+                        includes? (#{} :leaf :simple-expr) prev-kind
+                        , :simple-expr :expr
+                      if (= prev-kind :leaf) :simple-expr :expr
                     , kind
+                  or bended? $ or (= kind :expr) (= kind :boxed-expr)
         |generate-inline-expr $ quote
           defn generate-inline-expr (expr)
             str char-open
@@ -91,14 +102,15 @@
               , char-close
         |char-allowed? $ quote
           defn char-allowed? (x)
-            or (re-matches re-simple-chars x) (contains? special-charset  x)
+            or (re-matches re-simple-chars x) (includes? special-charset  x)
         |char-nothing $ quote (def char-nothing "\"")
         |special-charset $ quote
           def special-charset $ #{} & (split allowed-chars "\"")
         |write-code $ quote
           defn write-code (exprs & args)
             let
-                options $ either (first args) ({} $ :inline? false)
+                options $ either (first args)
+                  {} $ :inline? false
               generate-statements exprs options
         |char-open $ quote (def char-open "\"(")
         |char-space $ quote (def char-space "\" ")
@@ -106,140 +118,113 @@
           def re-simple-chars $ do (; "\"TODO, no regex in calcit yet...") |[a-zA-Z0-9]
         |generate-leaf $ quote
           defn generate-leaf (leaf)
-            if (= leaf $ []) (, "\"()")
-              if (every? char-allowed? $ split leaf "\"") (, leaf) (pr-str leaf)
+            if
+              = leaf $ []
+              , "\"()" $ if
+                every? char-allowed? $ split leaf "\""
+                , leaf (pr-str leaf)
         |generate-statements $ quote
           defn generate-statements (exprs options)
-            ->> exprs (transform-comma) (transform-dollar)
-              map $ fn (xs) (; println "\"gen" $ pr-str xs)
-                str &newline (generate-tree xs true options 0) &newline
+            ->> exprs
+              map $ fn (xs)
+                ; println "\"gen" $ pr-str xs
+                str &newline (generate-tree xs true options 0 false) &newline
               join-str "\""
         |render-spaces $ quote
           defn render-spaces (acc n)
             if (&= 0 n) acc $ recur (str acc "|  ") (dec n)
         |render-newline $ quote
-          defn render-newline (x) (str &newline $ render-spaces | x)
+          defn render-newline (x)
+            str &newline $ render-spaces | x
       :proc $ quote ()
     |cirru-writer.list $ {}
       :ns $ quote (ns cirru-writer.list)
       :defs $ {}
-        |transform-comma $ quote
-          defn transform-comma (xs)
-            loop
-                acc $ []
-                chunk $ []
-                nodes xs
-                prev-kind nil
-              if (empty? nodes)
-                if (empty? chunk) acc $ conj acc
-                  vec-add ([] "\",") chunk
-                let
-                    cursor $ first nodes
-                    kind $ if
-                      or (string? cursor) (= cursor $ [])
-                      , :leaf
-                      if
-                        and (= prev-kind :leaf) (simple? cursor)
-                        , :simple-expr :expr
-                  ; println "\"loop" acc chunk nodes (pr-str cursor) kind prev-kind
-                  if
-                    or
-                      and (= kind :leaf) (= prev-kind :expr)
-                      and (= kind :leaf) (not $ empty? chunk)
-                    recur acc (conj chunk cursor) (rest nodes) (, kind)
-                    let
-                        checked-acc $ if (empty? chunk) acc
-                          conj acc $ vec-add ([] "\",") chunk
-                      recur
-                        conj checked-acc $ if (string? cursor) cursor (transform-comma cursor)
-                        []
-                        rest nodes
-                        , kind
-        |transform-dollar $ quote
-          defn transform-dollar (xs) (transform-dollar-iter xs false)
-        |vec-add $ quote
-          defn vec-add (acc xs)
-            if (empty? xs) acc $ recur (conj acc $ first xs) (rest xs)
         |simple? $ quote
           defn simple? (expr)
             and (list? expr) (every? string? expr)
-        |transform-dollar-iter $ quote
-          defn transform-dollar-iter (xs at-dollar?)
-            if (string? xs) xs $ loop
-                acc $ []
-                nodes xs
-                prev-kind nil
-                head? true
-              if (empty? nodes) acc $ let
-                  cursor $ first nodes
-                  kind $ if (string? cursor) :leaf :expr
-                  dollar-tail? $ and (not head?) (= prev-kind :leaf) (not at-dollar?) (list? cursor) (empty? $ rest nodes)
-                ; println |checking cursor dollar-tail?
-                if dollar-tail?
-                  let
-                      next-acc $ vec-add acc
-                        vec-add ([] "\"$") (transform-dollar-iter cursor true)
-                    recur next-acc (rest nodes) kind false
-                  recur
-                    conj acc $ if (= kind :leaf) cursor (transform-dollar-iter cursor false)
-                    rest nodes
-                    , kind false
       :proc $ quote ()
     |cirru-writer.main $ {}
       :ns $ quote
-        ns cirru-writer.main $ :require ([] respo.core :refer $ [] render! clear-cache! realize-ssr!) ([] cirru-writer.comp.container :refer $ [] comp-container) ([] cirru-writer.updater :refer $ [] updater) ([] cirru-writer.schema :as schema) ([] reel.core :refer $ [] reel-updater refresh-reel) ([] reel.util :refer $ [] listen-devtools!) ([] reel.schema :as reel-schema) ([] cirru-writer.config :as config) ([] cirru-writer.test :refer $ [] run-tests)
+        ns cirru-writer.main $ :require
+          [] respo.core :refer $ [] render! clear-cache! realize-ssr!
+          [] cirru-writer.comp.container :refer $ [] comp-container
+          [] cirru-writer.updater :refer $ [] updater
+          [] cirru-writer.schema :as schema
+          [] reel.core :refer $ [] reel-updater refresh-reel
+          [] reel.util :refer $ [] listen-devtools!
+          [] reel.schema :as reel-schema
+          [] cirru-writer.config :as config
+          [] cirru-writer.test :refer $ [] run-tests
       :defs $ {}
         |*reel $ quote
           defatom *reel $ -> reel-schema/reel (assoc :base schema/store) (assoc :store schema/store)
         |dispatch! $ quote
-          defn dispatch! (op op-data) (when config/dev? $ println "\"Dispatch:" op) (reset! *reel $ reel-updater updater @*reel op op-data)
+          defn dispatch! (op op-data)
+            when config/dev? $ println "\"Dispatch:" op
+            reset! *reel $ reel-updater updater @*reel op op-data
         |main! $ quote
-          defn main! ()
-            if
-              = |ci $ with-log (get-env |env)
-              run-tests
-              do (render-app! render!)
-                add-watch *reel :changes $ fn (reel prev) (render-app! render!)
-                listen-devtools! |a dispatch!
-                println "|App started."
+          defn main! () $ if
+            = |ci $ with-log (get-env |env)
+            run-tests
+            do (render-app! render!)
+              add-watch *reel :changes $ fn (reel prev) (render-app! render!)
+              listen-devtools! |a dispatch!
+              println "|App started."
         |mount-target $ quote
           def mount-target $ if (exists? js/document) (.querySelector js/document |.app)
         |reload! $ quote
-          defn reload! () (clear-cache!) (reset! *reel $ refresh-reel @*reel schema/store updater) (println "|Code updated.")
+          defn reload! () (clear-cache!)
+            reset! *reel $ refresh-reel @*reel schema/store updater
+            println "|Code updated."
         |render-app! $ quote
           defn render-app! (renderer)
             renderer mount-target (comp-container @*reel) (\ dispatch! % %2)
       :proc $ quote ()
     |cirru-writer.test $ {}
       :ns $ quote
-        ns cirru-writer.test $ :require ([] calcit-test.core :refer $ [] deftest is testing) ([] cirru-writer.core :refer $ [] write-code)
+        ns cirru-writer.test $ :require
+          [] calcit-test.core :refer $ [] deftest is testing
+          [] cirru-writer.core :refer $ [] write-code
       :defs $ {}
         |spaces-test $ quote
           deftest spaces-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/spaces.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/spaces.json
               expected $ slurp |examples/cirru/spaces.cirru
             testing "|writing case for spaces"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |indent-test $ quote
           deftest indent-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/indent.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/indent.json
               expected $ slurp |examples/cirru/indent.cirru
             testing "|writing case for indent"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |line-test $ quote
           deftest line-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/line.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/line.json
               expected $ slurp |examples/cirru/line.cirru
             testing "|case for line"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
+        |cond-test $ quote
+          deftest cond-test $ let
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/cond.json
+              expected $ slurp |examples/cirru/cond.cirru
+            testing "|writing case for cond"
+              is $ = (parse-cirru expected) data
+              is $ = (write-code data) expected
         |run-tests $ quote
-          defn run-tests () (demo-test) (double-nesting-test) (fold-vectors-test) (folding-test) (html-test) (indent-test) (inline-mode-test) (inline-simple-test) (line-test) (nested-2-test) (parentheses-test) (quote-test) (spaces-test) (unfolding-test)
+          defn run-tests () (demo-test) (double-nesting-test) (fold-vectors-test) (folding-test) (html-test) (indent-test) (inline-mode-test) (inline-simple-test) (line-test) (nested-2-test) (parentheses-test) (quote-test) (spaces-test) (unfolding-test) (append-indent-test) (cond-test)
         |parentheses-test $ quote
           deftest parentheses-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/parentheses.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/parentheses.json
               expected $ slurp |examples/cirru/parentheses.cirru
             testing "|writing case for parentheses"
               is $ = (parse-cirru expected) data
@@ -248,16 +233,26 @@
           defmacro slurp (x) (read-file x)
         |fold-vectors-test $ quote
           deftest fold-vectors-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/fold-vectors.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/fold-vectors.json
               expected $ slurp |examples/cirru/fold-vectors.cirru
             testing "|writing case for fold-vectors"
               is $ = (parse-cirru expected) data
               is $ =
                 write-code data $ {} (:inline? true)
                 , expected
+        |append-indent-test $ quote
+          deftest append-indent-test $ let
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/append-indent.json
+              expected $ slurp |examples/cirru/append-indent.cirru
+            testing "|case for append-indent"
+              is $ = (parse-cirru expected) data
+              is $ = (write-code data) expected
         |inline-mode-test $ quote
           deftest inline-mode-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/inline-mode.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/inline-mode.json
               expected $ slurp |examples/cirru/inline-mode.cirru
             testing "|writing case for inline-mode"
               is $ = (parse-cirru expected) data
@@ -266,14 +261,17 @@
                 , expected
         |folding-test $ quote
           deftest folding-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/folding.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/folding.json
               expected $ slurp |examples/cirru/folding.cirru
             testing "|writing case for folding"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |inline-simple-test $ quote
           deftest inline-simple-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/inline-simple.json) (, true)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/inline-simple.json
+                , true
               expected $ slurp |examples/cirru/inline-simple.cirru
             testing "|writing case for inline-simple"
               is $ = (parse-cirru expected) data
@@ -291,7 +289,9 @@
                 , expected
         |html-test $ quote
           deftest html-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/html.json) (, true)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/html.json
+                , true
               expected $ slurp |examples/cirru/html.cirru
               expected-inline $ slurp |examples/cirru/html-inline.cirru
             testing "|writing case for html"
@@ -304,21 +304,24 @@
                 , expected-inline
         |double-nesting-test $ quote
           deftest double-nesting-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/double-nesting.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/double-nesting.json
               expected $ slurp |examples/cirru/double-nesting.cirru
             testing "|writing case for double-nesting"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |nested-2-test $ quote
           deftest nested-2-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/nested-2.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/nested-2.json
               expected $ slurp |examples/cirru/nested-2.cirru
             testing "|writing case for nested-2"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |demo-test $ quote
           deftest demo-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/demo.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/demo.json
               expected $ slurp |examples/cirru/demo.cirru
             testing "|writing case for demo"
               is $ = (parse-cirru expected) data
@@ -332,35 +335,48 @@
               is $ = (write-code data) expected
         |quote-test $ quote
           deftest quote-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/quote.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/quote.json
               expected $ slurp |examples/cirru/quote.cirru
             testing "|case for quote"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |unfolding-test $ quote
           deftest unfolding-test $ let
-              data $ to-calcit-data (js/JSON.parse $ slurp |examples/ast/unfolding.json)
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/unfolding.json
               expected $ slurp |examples/cirru/unfolding.cirru
             testing "|writing case for unfolding"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
       :proc $ quote
-          defn main! () (run-tests)
-          defn reload! () (main!)
+          defn main! () $ run-tests
+          defn reload! () $ main!
     |cirru-writer.updater $ {}
       :ns $ quote
-        ns cirru-writer.updater $ :require ([] respo.cursor :refer $ [] update-states)
+        ns cirru-writer.updater $ :require
+          [] respo.cursor :refer $ [] update-states
       :defs $ {}
         |updater $ quote
           defn updater (store op op-data op-id op-time)
-            case op (:states $ update-states store op-data) (:content $ assoc store :content op-data)
-              :generate $ merge store op-data ({} $ :error nil)
+            case op
+              :states $ update-states store op-data
+              :content $ assoc store :content op-data
+              :generate $ merge store op-data
+                {} $ :error nil
               :error $ assoc store :error op-data
-              op $ do (.warn js/console "|Unknown op:" $ pr-str op) (, store)
+              op $ do
+                .warn js/console "|Unknown op:" $ pr-str op
+                , store
       :proc $ quote ()
     |cirru-writer.comp.container $ {}
       :ns $ quote
-        ns cirru-writer.comp.container $ :require ([] respo.core :refer $ [] defcomp div <> textarea button pre a) ([] respo-ui.core :as ui) ([] hsl.core :refer $ [] hsl) ([] respo.comp.space :refer $ [] =<) ([] cirru-writer.core :refer $ [] generate-statements)
+        ns cirru-writer.comp.container $ :require
+          [] respo.core :refer $ [] defcomp div <> textarea button pre a
+          [] respo-ui.core :as ui
+          [] hsl.core :refer $ [] hsl
+          [] respo.comp.space :refer $ [] =<
+          [] cirru-writer.core :refer $ [] generate-statements
       :defs $ {}
         |comp-container $ quote
           defcomp comp-container (reel)
@@ -372,11 +388,14 @@
                   {} $ :style
                     merge $ {} (:padding |8) (:font-family |Helvetica,serif)
                   <> "|Demo of "
-                  a ({} $ :href |https://github.com/Cirru/writer.clj/) (<> |Cirru/writer.clj)
+                  a
+                    {} $ :href |https://github.com/Cirru/writer.clj/
+                    <> |Cirru/writer.clj
                   =< 8 nil
                   button
                     {}
-                      :style $ merge ui/button ({} $ :vertical-align :middle)
+                      :style $ merge ui/button
+                        {} $ :vertical-align :middle
                       :on-click $ fn (e d!)
                         do
                           let
@@ -389,27 +408,48 @@
                           ; catch js/Error. error $ d! :error error
                     <> |Generate
                   =< 8 nil
-                  <> (:error store) ({} $ :color :red)
+                  <> (:error store)
+                    {} $ :color :red
                 div
                   {} $ :style
                     merge ui/row $ {} (:padding "|0 8px")
-                  textarea $ {} (:style $ merge ui/expand ui/textarea style-input-content) (:value $ :content store)
-                    :on-input $ fn (e d!) (d! :content $ :value e)
-                  textarea $ {} (:style $ merge ui/expand ui/textarea style-input-content) (:value $ :result store)
+                  textarea $ {}
+                    :style $ merge ui/expand ui/textarea style-input-content
+                    :value $ :content store
+                    :on-input $ fn (e d!)
+                      d! :content $ :value e
+                  textarea $ {}
+                    :style $ merge ui/expand ui/textarea style-input-content
+                    :value $ :result store
         |style-code $ quote
-          def style-code $ {} (:font-family |Menlo,monospace) (:background-color $ hsl 0 0 94) (:padding 8) (:margin 0) (:font-size 12) (:overflow :auto) (:white-space :pre-line) (:line-height 1.8)
+          def style-code $ {} (:font-family |Menlo,monospace)
+            :background-color $ hsl 0 0 94
+            :padding 8
+            :margin 0
+            :font-size 12
+            :overflow :auto
+            :white-space :pre-line
+            :line-height 1.8
         |style-input-content $ quote
           def style-input-content $ {} (:width 400) (:flex-shrink 0) (:height 600) (:font-family |Menlo,monospace) (:white-space :pre) (:font-size 12)
       :proc $ quote ()
     |cirru-writer.schema $ {}
       :ns $ quote
-        ns cirru-writer.schema $ :require ([] cljs.reader :refer $ [] read-string) ([] cirru-writer.core :refer $ [] generate-statements)
+        ns cirru-writer.schema $ :require
+          [] cljs.reader :refer $ [] read-string
+          [] cirru-writer.core :refer $ [] generate-statements
       :defs $ {}
         |store $ quote
           def store $ let
               content $ slurp |demo.json
-              result $ generate-statements (to-calcit-data $ js/JSON.parse content) ({} $ :inline? false)
-            {} (:states $ {}) (:content content) (:result result) (:error nil)
+              result $ generate-statements
+                to-calcit-data $ js/JSON.parse content
+                {} $ :inline? false
+            {}
+              :states $ {}
+              :content content
+              :result result
+              :error nil
         |slurp $ quote
           defmacro slurp (file) (read-file file)
       :proc $ quote ()
@@ -418,12 +458,12 @@
       :defs $ {}
         |cdn? $ quote
           def cdn? $ cond
+            
               exists? js/window
               , false
-            (exists? js/process)
-              = "\"true" js/process.env.cdn
+            (exists? js/process) (= "\"true" js/process.env.cdn)
             :else false
         |dev? $ quote (def dev? true)
         |site $ quote
-          def site $ {} (:dev-ui "\"http://localhost:8100/main-fonts.css") (:release-ui "\"http://cdn.tiye.me/favored-fonts/main-fonts.css") (:cdn-url "\"http://cdn.tiye.me/writer.clj/") (:title "\"Writer") (:icon "\"http://cdn.tiye.me/logo/cirru.png") (:storage-key "\"writer.clj")
+          def site $ {} (:dev-ui "\"http://localhost:8100/main-fonts.css") (:release-ui "\"http://cdn.tiye.me/favored-fonts/main-fonts.css") (:cdn-url "\"http://cdn.tiye.me/writer.clj/") (:title "\"Writer") (:icon "\"http://cdn.tiye.me/logo/cirru.png") (:storage-key "\"writer.calcit")
       :proc $ quote ()
