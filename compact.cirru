@@ -2,7 +2,7 @@
 {} (:package |cirru-writer)
   :configs $ {} (:init-fn |cirru-writer.main/main!) (:reload-fn |cirru-writer.main/reload!)
     :modules $ [] |memof/compact.cirru |lilac/compact.cirru |respo.calcit/compact.cirru |respo-ui.calcit/compact.cirru |reel.calcit/compact.cirru |calcit-test/compact.cirru
-    :version |0.2.1
+    :version |0.2.2
   :files $ {}
     |cirru-writer.core $ {}
       :ns $ quote
@@ -54,7 +54,9 @@
                           str char-space $ generate-inline-expr cursor
                         :else $ str (render-newline next-level) (generate-tree cursor child-insist-head? options next-level false)
                     (= kind :expr)
-                      str (render-newline next-level) (generate-tree cursor child-insist-head? options next-level false)
+                      &let
+                        content $ generate-tree cursor child-insist-head? options next-level false
+                        if (starts-with? content &newline) content $ str (render-newline next-level) content
                     (= kind :boxed-expr)
                       str
                         if
@@ -174,7 +176,7 @@
         |mount-target $ quote
           def mount-target $ if (exists? js/document) (.querySelector js/document |.app)
         |reload! $ quote
-          defn reload! () (clear-cache!) (remove-watch *reel changes)
+          defn reload! () (clear-cache!) (remove-watch *reel :changes)
             add-watch *reel :changes $ fn (reel prev) (render-app! render!)
             reset! *reel $ refresh-reel @*reel schema/store updater
             println "|Code updated."
@@ -194,6 +196,14 @@
                 js/JSON.parse $ slurp |examples/ast/spaces.json
               expected $ slurp |examples/cirru/spaces.cirru
             testing "|writing case for spaces"
+              is $ = (parse-cirru expected) data
+              is $ = (write-code data) expected
+        |cond-short-test $ quote
+          deftest cond-short-test $ let
+              data $ to-calcit-data
+                js/JSON.parse $ slurp |examples/ast/cond-short.json
+              expected $ slurp |examples/cirru/cond-short.cirru
+            testing "|writing case for cond short"
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |indent-test $ quote
@@ -221,7 +231,7 @@
               is $ = (parse-cirru expected) data
               is $ = (write-code data) expected
         |run-tests $ quote
-          defn run-tests () (demo-test) (double-nesting-test) (fold-vectors-test) (folding-test) (html-test) (indent-test) (inline-mode-test) (inline-simple-test) (line-test) (nested-2-test) (parentheses-test) (quote-test) (spaces-test) (unfolding-test) (append-indent-test) (cond-test)
+          defn run-tests () (demo-test) (double-nesting-test) (fold-vectors-test) (folding-test) (html-test) (indent-test) (inline-mode-test) (inline-simple-test) (line-test) (nested-2-test) (parentheses-test) (quote-test) (spaces-test) (unfolding-test) (append-indent-test) (cond-test) (cond-short-test)
         |parentheses-test $ quote
           deftest parentheses-test $ let
               data $ to-calcit-data
